@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced YouTube Downloader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary-color: #568F87;
+            --secondary-color: #064232;
+            --success-color: #568F87;
+            --error-color: #F5BABB;
+            --warning-color: #F5BABB;
+            --bg-light: #FFF5F2;
+            --bg-dark: #064232;
+            --card-light: #FFF5F2;
+            --card-dark: #568F87;
+            --text-light: #064232;
+            --text-dark: #FFF5F2;
+        }
+        
+        body { 
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease;
+        }
+        
+        .dark {
+            background-color: var(--bg-dark);
+            color: var(--text-dark);
+        }
+        
+        .dark .card {
+            background-color: var(--card-dark);
+            border-color: #334155;
+        }
+        
+        .progress-bar-fill { 
+            transition: width 0.3s ease-in-out;
+        }
+        
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .animate-pulse-slow {
+            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .hover-scale {
+            transition: transform 0.2s ease;
+        }
+        
+        .hover-scale:hover {
+            transform: scale(1.02);
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body class="transition-colors duration-300" style="background-color: #FFF5F2; color: #064232;">
+    <!-- Notification Container -->
+    <div id="notification-container"></div>
+    
+    <!-- Navigation Bar -->
+    <nav class="shadow-lg border-b" style="background-color: #FFF5F2; border-color: #F5BABB;">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-download text-2xl" style="color: #568F87;"></i>
+                    <h1 class="text-xl font-bold" style="color: #064232;">Advanced YouTube Downloader</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="theme-toggle" class="p-2 rounded-lg transition-colors" style="background-color: #F5BABB; color: #064232;" onmouseover="this.style.backgroundColor='#568F87'" onmouseout="this.style.backgroundColor='#F5BABB'">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button id="settings-btn" class="p-2 rounded-lg transition-colors" style="background-color: #F5BABB; color: #064232;" onmouseover="this.style.backgroundColor='#568F87'" onmouseout="this.style.backgroundColor='#F5BABB'">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6 md:p-10 max-w-6xl">
+        <!-- Stats Dashboard -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="card p-6 rounded-xl shadow-lg hover-scale" style="background-color: #FFF5F2;">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full" style="background-color: #F5BABB;">
+                        <i class="fas fa-download" style="color: #568F87;"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm" style="color: #568F87;">Total Downloads</p>
+                        <p id="total-downloads" class="text-2xl font-bold" style="color: #064232;">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-6 rounded-xl shadow-lg hover-scale" style="background-color: #FFF5F2;">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full" style="background-color: #F5BABB;">
+                        <i class="fas fa-check-circle" style="color: #568F87;"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm" style="color: #568F87;">Completed</p>
+                        <p id="completed-downloads" class="text-2xl font-bold" style="color: #064232;">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-6 rounded-xl shadow-lg hover-scale" style="background-color: #FFF5F2;">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full" style="background-color: #F5BABB;">
+                        <i class="fas fa-clock" style="color: #568F87;"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm" style="color: #568F87;">In Progress</p>
+                        <p id="active-downloads" class="text-2xl font-bold" style="color: #064232;">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-6 rounded-xl shadow-lg hover-scale" style="background-color: #FFF5F2;">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full" style="background-color: #F5BABB;">
+                        <i class="fas fa-exclamation-triangle" style="color: #568F87;"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm" style="color: #568F87;">Failed</p>
+                        <p id="failed-downloads" class="text-2xl font-bold" style="color: #064232;">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- URL Input Section -->
+        <div class="card p-6 md:p-8 rounded-2xl shadow-lg mb-8" style="background-color: #FFF5F2;">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold flex items-center" style="color: #064232;">
+                    <i class="fas fa-link mr-3" style="color: #568F87;"></i>
+                    URL Input
+                </h2>
+                <div class="flex items-center space-x-2">
+                    <button id="batch-toggle" class="px-4 py-2 rounded-lg transition-colors" style="background-color: #F5BABB; color: #064232;" onmouseover="this.style.backgroundColor='#568F87'; this.style.color='#FFF5F2'" onmouseout="this.style.backgroundColor='#F5BABB'; this.style.color='#064232'">
+                        <i class="fas fa-list mr-2"></i>Batch Mode
+                    </button>
+                    <button id="paste-btn" class="px-4 py-2 rounded-lg transition-colors" style="background-color: #568F87; color: #FFF5F2;" onmouseover="this.style.backgroundColor='#064232'" onmouseout="this.style.backgroundColor='#568F87'">
+                        <i class="fas fa-clipboard mr-2"></i>Paste
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Single URL Input -->
+            <div id="single-url-input" class="space-y-4">
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex-grow relative">
+                        <input type="text" id="url-input" placeholder="https://www.youtube.com/watch?v=... or playlist URL" 
+                            class="w-full p-4 pl-12 rounded-xl focus:outline-none transition" style="border: 2px solid #F5BABB; background-color: #FFF5F2; color: #064232;" onfocus="this.style.borderColor='#568F87'" onblur="this.style.borderColor='#F5BABB'">
+                        <i class="fas fa-globe absolute left-4 top-1/2 transform -translate-y-1/2" style="color: #568F87;"></i>
+                    </div>
+                    <button id="fetch-btn" 
+                        class="font-semibold py-3 px-6 rounded-xl transition duration-300 disabled:cursor-not-allowed flex items-center" style="background-color: #568F87; color: #FFF5F2;" onmouseover="this.style.backgroundColor='#064232'" onmouseout="this.style.backgroundColor='#568F87'">
+                        <i class="fas fa-search mr-2"></i>
+                        <span>Fetch Metadata</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Batch URL Input -->
+            <div id="batch-url-input" class="hidden space-y-4">
+                <div class="relative">
+                    <textarea id="batch-urls" placeholder="Enter multiple URLs (one per line):\nhttps://www.youtube.com/watch?v=...\nhttps://www.youtube.com/playlist?list=..." 
+                        class="w-full p-4 pl-12 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition h-32 resize-none"></textarea>
+                    <i class="fas fa-list absolute left-4 top-4 text-gray-400"></i>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <button id="batch-fetch-btn" 
+                        class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-blue-700 transition duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center">
+                        <i class="fas fa-download mr-2"></i>
+                        <span>Fetch All Metadata</span>
+                    </button>
+                    <button id="clear-batch-btn" 
+                        class="bg-gray-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-700 transition duration-300 flex items-center">
+                        <i class="fas fa-trash mr-2"></i>
+                        <span>Clear All</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- URL Validation Status -->
+            <div id="url-status" class="mt-4 hidden">
+                <div class="flex items-center p-3 rounded-lg">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <span id="url-status-text"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Queue Management -->
+        <div style="background-color: var(--bg-color); padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 32px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+                <h2 style="font-size: 24px; font-weight: bold; color: var(--text-color); display: flex; align-items: center;">
+                    <i class="fas fa-tasks" style="margin-right: 12px; color: var(--accent-color);"></i>
+                    Download Queue
+                </h2>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button id="pause-all-btn" style="padding: 8px 16px; background-color: var(--secondary-bg); color: var(--text-color); border-radius: 8px; border: none; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.backgroundColor='var(--accent-color)'" onmouseout="this.style.backgroundColor='var(--secondary-bg)'">
+                        <i class="fas fa-pause" style="margin-right: 8px;"></i>Pause All
+                    </button>
+                    <button id="resume-all-btn" style="padding: 8px 16px; background-color: var(--accent-color); color: var(--bg-color); border-radius: 8px; border: none; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                        <i class="fas fa-play" style="margin-right: 8px;"></i>Resume All
+                    </button>
+                    <button id="clear-completed-btn" style="padding: 8px 16px; background-color: var(--secondary-bg); color: var(--text-color); border-radius: 8px; border: none; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.backgroundColor='var(--accent-color)'" onmouseout="this.style.backgroundColor='var(--secondary-bg)'">
+                        <i class="fas fa-trash" style="margin-right: 8px;"></i>Clear Completed
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Queue Status -->
+            <div id="queue-status" style="margin-bottom: 16px; padding: 16px; background-color: var(--secondary-bg); border-radius: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: var(--text-secondary);">
+                    <span>Queue: <span id="queue-count" style="font-weight: 600;">0</span> items</span>
+                    <span>Active: <span id="active-count" style="font-weight: 600;">0</span></span>
+                    <span>Completed: <span id="completed-count" style="font-weight: 600;">0</span></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Results Section -->
+        <div id="results-container" class="space-y-6">
+            <!-- Populated dynamically -->
+        </div>
+        
+        <!-- Settings Modal -->
+        <div id="settings-modal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: none; z-index: 50; align-items: center; justify-content: center;">
+            <div style="background-color: var(--bg-color); padding: 32px; border-radius: 16px; box-shadow: 0 20px 25px rgba(0,0,0,0.15); max-width: 448px; width: 100%; margin: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+                    <h3 style="font-size: 24px; font-weight: bold; color: var(--text-color);">Settings</h3>
+                    <button id="close-settings" style="color: var(--text-secondary); background: none; border: none; cursor: pointer; transition: color 0.3s;" onmouseover="this.style.color='var(--text-color)'" onmouseout="this.style.color='var(--text-secondary)'">
+                        <i class="fas fa-times" style="font-size: 20px;"></i>
+                    </button>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                    <div>
+                        <label style="display: block; font-size: 14px; font-weight: 500; color: var(--text-color); margin-bottom: 8px;">Default Quality</label>
+                        <select id="default-quality" style="width: 100%; padding: 12px; border: 1px solid var(--secondary-bg); background-color: var(--bg-color); color: var(--text-color); border-radius: 8px; outline: none;">
+                            <option value="best_mp4">Best Video (MP4)</option>
+                            <option value="720p_mp4">720p Video (MP4)</option>
+                            <option value="480p_mp4">480p Video (MP4)</option>
+                            <option value="mp3">Audio Only (MP3)</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label style="display: flex; align-items: center;">
+                            <input type="checkbox" id="auto-download" style="margin-right: 12px; accent-color: var(--accent-color);">
+                            <span style="color: var(--text-color);">Auto-download after fetching metadata</span>
+                        </label>
+                    </div>
+                    
+                    <div>
+                        <label style="display: flex; align-items: center;">
+                            <input type="checkbox" id="notifications" style="margin-right: 12px; accent-color: var(--accent-color);" checked>
+                            <span style="color: var(--text-color);">Show notifications</span>
+                        </label>
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; font-size: 14px; font-weight: 500; color: var(--text-color); margin-bottom: 8px;">Concurrent Downloads</label>
+                        <input type="range" id="concurrent-downloads" min="1" max="5" value="2" style="width: 100%; accent-color: var(--accent-color);">
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                            <span>1</span>
+                            <span id="concurrent-value">2</span>
+                            <span>5</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 32px;">
+                    <button id="reset-settings" style="padding: 8px 16px; background-color: var(--secondary-bg); color: var(--text-color); border-radius: 8px; border: none; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.backgroundColor='var(--accent-color)'; this.style.color='var(--bg-color)'" onmouseout="this.style.backgroundColor='var(--secondary-bg)'; this.style.color='var(--text-color)'">
+                        Reset
+                    </button>
+                    <button id="save-settings" style="padding: 8px 16px; background-color: var(--accent-color); color: var(--bg-color); border-radius: 8px; border: none; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const urlInput = document.getElementById('url-input');
+            const fetchBtn = document.getElementById('fetch-btn');
+            const batchUrls = document.getElementById('batch-urls');
+            const batchFetchBtn = document.getElementById('batch-fetch-btn');
+            const resultsContainer = document.getElementById('results-container');
+            const themeToggle = document.getElementById('theme-toggle');
+            const settingsBtn = document.getElementById('settings-btn');
+            const settingsModal = document.getElementById('settings-modal');
+            const batchToggle = document.getElementById('batch-toggle');
+            const pasteBtn = document.getElementById('paste-btn');
+            
+            // State
+            let jobCounter = 0;
+            let isBatchMode = false;
+            let downloadStats = {
+                total: 0,
+                completed: 0,
+                active: 0,
+                failed: 0
+            };
+            
+            // Settings
+            let settings = {
+                theme: localStorage.getItem('theme') || 'light',
+                defaultQuality: localStorage.getItem('defaultQuality') || 'best_mp4',
+                autoDownload: localStorage.getItem('autoDownload') === 'true',
+                notifications: localStorage.getItem('notifications') !== 'false',
+                concurrentDownloads: parseInt(localStorage.getItem('concurrentDownloads')) || 2
+            };
+            
+            // Socket connection
+            const socket = io.connect('http://' + document.domain + ':' + location.port);
+            socket.on('connect', () => {
+                console.log('Connected to server!');
+                showNotification('Connected to server', 'success');
+            });
+            
+            // Initialize theme
+            initializeTheme();
+            loadSettings();
+            
+            // Event Listeners
+            themeToggle.addEventListener('click', toggleTheme);
+            settingsBtn.addEventListener('click', () => settingsModal.style.display = 'flex');
+            document.getElementById('close-settings').addEventListener('click', () => settingsModal.style.display = 'none');
+            batchToggle.addEventListener('click', toggleBatchMode);
+            pasteBtn.addEventListener('click', pasteFromClipboard);
+            fetchBtn.addEventListener('click', () => fetchMetadata(false));
+            batchFetchBtn.addEventListener('click', () => fetchMetadata(true));
+            document.getElementById('clear-batch-btn').addEventListener('click', () => batchUrls.value = '');
+            document.getElementById('save-settings').addEventListener('click', saveSettings);
+            document.getElementById('reset-settings').addEventListener('click', resetSettings);
+            document.getElementById('concurrent-downloads').addEventListener('input', updateConcurrentValue);
+            
+            // Queue management
+            document.getElementById('pause-all-btn').addEventListener('click', pauseAllDownloads);
+            document.getElementById('resume-all-btn').addEventListener('click', resumeAllDownloads);
+            document.getElementById('clear-completed-btn').addEventListener('click', clearCompletedDownloads);
+            
+            // Functions
+            function initializeTheme() {
+                if (settings.theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                }
+            }
+            
+            function toggleTheme() {
+                document.documentElement.classList.toggle('dark');
+                settings.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+                localStorage.setItem('theme', settings.theme);
+            }
+            
+            function toggleBatchMode() {
+                isBatchMode = !isBatchMode;
+                const singleInput = document.getElementById('single-url-input');
+                const batchInput = document.getElementById('batch-url-input');
+                
+                if (isBatchMode) {
+                    singleInput.style.display = 'none';
+                    batchInput.style.display = 'block';
+                    batchToggle.innerHTML = '<i class="fas fa-link" style="margin-right: 8px;"></i>Single Mode';
+                    batchToggle.style.backgroundColor = 'var(--accent-color)';
+                    batchToggle.style.color = 'var(--bg-color)';
+                } else {
+                    singleInput.style.display = 'block';
+                    batchInput.style.display = 'none';
+                    batchToggle.innerHTML = '<i class="fas fa-list" style="margin-right: 8px;"></i>Batch Mode';
+                    batchToggle.style.backgroundColor = 'var(--secondary-bg)';
+                    batchToggle.style.color = 'var(--text-color)';
+                }
+            }
+            
+            async function pasteFromClipboard() {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    if (isBatchMode) {
+                        batchUrls.value = text;
+                    } else {
+                        urlInput.value = text;
+                    }
+                    showNotification('Pasted from clipboard', 'success');
+                } catch (err) {
+                    showNotification('Failed to paste from clipboard', 'error');
+                }
+            }
+            
+            async function fetchMetadata(batch = false) {
+                const urls = batch ? getUrlsFromBatch() : [urlInput.value.trim()];
+                
+                if (urls.length === 0) {
+                    showNotification('Please enter at least one valid URL', 'error');
+                    return;
+                }
+                
+                const btn = batch ? batchFetchBtn : fetchBtn;
+                const originalText = btn.innerHTML;
+                
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Fetching...';
+                
+                if (!batch) {
+                    resultsContainer.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i><p class="text-gray-500 dark:text-gray-400">Loading metadata...</p></div>';
+                }
+                
+                try {
+                    for (const url of urls) {
+                        await fetchSingleMetadata(url);
+                    }
+                } catch (error) {
+                    showNotification(`Error: ${error.message}`, 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            }
+            
+            function getUrlsFromBatch() {
+                return batchUrls.value
+                    .split('\n')
+                    .map(url => url.trim())
+                    .filter(url => url && isValidUrl(url));
+            }
+            
+            function isValidUrl(string) {
+                try {
+                    new URL(string);
+                    return true;
+                } catch (_) {
+                    return false;
+                }
+            }
+            
+            async function fetchSingleMetadata(url) {
+                const response = await fetch('/api/metadata', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to fetch metadata.');
+                }
+                
+                const metadataList = await response.json();
+                displayMetadata(metadataList);
+            }
+
+            function displayMetadata(metadataList) {
+                if (resultsContainer.innerHTML.includes('Loading metadata')) {
+                    resultsContainer.innerHTML = '';
+                }
+                
+                metadataList.forEach(video => {
+                    jobCounter++;
+                    const jobId = `job-${jobCounter}`;
+                    const duration = video.duration ? formatDuration(video.duration) : 'N/A';
+                    const filesize = video.filesize || video.filesize_approx;
+                    const sizeText = filesize ? formatFileSize(filesize) : 'Unknown';
+                    
+                    downloadStats.total++;
+                    updateStats();
+
+                    const cardHTML = `
+                        <div id="${jobId}" class="card bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg hover-scale transition-all duration-300 border border-gray-200 dark:border-gray-700">
+                            <div class="flex flex-col lg:flex-row gap-6">
+                                <div class="relative">
+                                    <img src="${video.thumbnail}" alt="Thumbnail" class="w-full lg:w-64 h-36 lg:h-36 rounded-xl object-cover shadow-md">
+                                    <div class="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+                                        ${duration}
+                                    </div>
+                                </div>
+                                <div class="flex-grow space-y-4">
+                                    <div>
+                                        <h3 class="font-bold text-xl lg:text-2xl text-gray-800 dark:text-white line-clamp-2">${video.title}</h3>
+                                        <div class="flex flex-wrap gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                            <span><i class="fas fa-clock mr-1"></i>Duration: ${duration}</span>
+                                            <span><i class="fas fa-hdd mr-1"></i>Size: ~${sizeText}</span>
+                                            <span><i class="fas fa-eye mr-1"></i>Views: ${formatNumber(video.view_count || 0)}</span>
+                                        </div>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2 line-clamp-2">${video.description || 'No description available'}</p>
+                                    </div>
+                                    
+                                    <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                        <div class="flex-grow">
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quality</label>
+                                            <select class="quality-select w-full p-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                                                <option value="best_mp4">Best Video (MP4)</option>
+                                                <option value="720p_mp4">720p Video (MP4)</option>
+                                                <option value="480p_mp4">480p Video (MP4)</option>
+                                                <option value="360p_mp4">360p Video (MP4)</option>
+                                                <option value="mp3">Audio Only (MP3)</option>
+                                            </select>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button class="download-btn bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold py-3 px-6 rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 flex items-center shadow-lg" data-url="${video.webpage_url || video.url}">
+                                                <i class="fas fa-download mr-2"></i>
+                                                Download
+                                            </button>
+                                            <button class="preview-btn bg-blue-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-blue-700 transition-colors" data-url="${video.webpage_url || video.url}" title="Preview">
+                                                <i class="fas fa-play"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="progress-container mt-4 hidden">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <span class="status-text text-sm font-medium text-gray-700 dark:text-gray-300"></span>
+                                            <div class="flex items-center space-x-2">
+                                                <span class="progress-percent text-sm font-medium text-gray-700 dark:text-gray-300"></span>
+                                                <button class="cancel-btn text-red-600 hover:text-red-800 transition-colors" title="Cancel Download">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                                            <div class="progress-bar-fill bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                            <span class="speed-text"></span>
+                                            <span class="eta-text"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    resultsContainer.insertAdjacentHTML('beforeend', cardHTML);
+
+                    const cardElement = document.getElementById(jobId);
+                    const qualitySelect = cardElement.querySelector('.quality-select');
+                    qualitySelect.value = settings.defaultQuality;
+                    
+                    cardElement.querySelector('.download-btn').addEventListener('click', (e) => {
+                        startDownload(jobId, e.target.dataset.url, qualitySelect.value);
+                    });
+                    
+                    cardElement.querySelector('.preview-btn').addEventListener('click', (e) => {
+                        window.open(e.target.dataset.url, '_blank');
+                    });
+                    
+                    if (settings.autoDownload) {
+                        setTimeout(() => {
+                            startDownload(jobId, video.webpage_url || video.url, settings.defaultQuality);
+                        }, 1000);
+                    }
+                });
+            }
+
+            function startDownload(jobId, url, quality) {
+                const cardElement = document.getElementById(jobId);
+                const progressContainer = cardElement.querySelector('.progress-container');
+                const statusText = cardElement.querySelector('.status-text');
+                const progressPercent = cardElement.querySelector('.progress-percent');
+                const progressBarFill = cardElement.querySelector('.progress-bar-fill');
+                const speedText = cardElement.querySelector('.speed-text');
+                const etaText = cardElement.querySelector('.eta-text');
+                const downloadBtn = cardElement.querySelector('.download-btn');
+                const cancelBtn = cardElement.querySelector('.cancel-btn');
+
+                progressContainer.classList.remove('hidden');
+                downloadBtn.disabled = true;
+                downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Downloading...';
+                statusText.textContent = 'Starting download...';
+                
+                downloadStats.active++;
+                updateStats();
+                
+                let eventSource;
+                
+                const startEventSource = () => {
+                    eventSource = new EventSource(`/download?url=${encodeURIComponent(url)}&quality=${quality}`);
+                    
+                    eventSource.onmessage = function(event) {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.status === 'downloading') {
+                            const percent = data.percent || 0;
+                            progressPercent.textContent = `${percent.toFixed(1)}%`;
+                            progressBarFill.style.width = `${percent}%`;
+                            statusText.textContent = 'Downloading...';
+                            
+                            if (data.speed) {
+                                speedText.textContent = `Speed: ${data.speed}`;
+                            }
+                            if (data.eta) {
+                                etaText.textContent = `ETA: ${data.eta}`;
+                            }
+                        } else if (data.status === 'finished') {
+                            progressPercent.textContent = '100%';
+                            progressBarFill.style.width = '100%';
+                            statusText.textContent = 'Download completed!';
+                            downloadBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Downloaded';
+                            downloadBtn.classList.remove('from-green-600', 'to-green-700', 'hover:from-green-700', 'hover:to-green-800');
+                            downloadBtn.classList.add('from-gray-500', 'to-gray-600');
+                            cancelBtn.style.display = 'none';
+                            
+                            downloadStats.active--;
+                            downloadStats.completed++;
+                            updateStats();
+                            
+                            if (settings.notifications) {
+                                showNotification('Download completed!', 'success');
+                            }
+                            
+                            eventSource.close();
+                        } else if (data.status === 'error') {
+                            statusText.textContent = `Error: ${data.message}`;
+                            downloadBtn.disabled = false;
+                            downloadBtn.innerHTML = '<i class="fas fa-redo mr-2"></i>Retry Download';
+                            downloadBtn.classList.remove('from-green-600', 'to-green-700', 'hover:from-green-700', 'hover:to-green-800');
+                            downloadBtn.classList.add('from-red-600', 'to-red-700', 'hover:from-red-700', 'hover:to-red-800');
+                            
+                            downloadStats.active--;
+                            downloadStats.failed++;
+                            updateStats();
+                            
+                            if (settings.notifications) {
+                                showNotification('Download failed!', 'error');
+                            }
+                            
+                            eventSource.close();
+                        }
+                    };
+
+                    eventSource.onerror = function() {
+                        statusText.textContent = 'Connection error occurred';
+                        downloadBtn.disabled = false;
+                        downloadBtn.innerHTML = '<i class="fas fa-redo mr-2"></i>Retry Download';
+                        downloadBtn.classList.remove('from-green-600', 'to-green-700', 'hover:from-green-700', 'hover:to-green-800');
+                        downloadBtn.classList.add('from-red-600', 'to-red-700', 'hover:from-red-700', 'hover:to-red-800');
+                        
+                        downloadStats.active--;
+                        downloadStats.failed++;
+                        updateStats();
+                        
+                        eventSource.close();
+                    };
+                };
+                
+                cancelBtn.addEventListener('click', () => {
+                    if (eventSource) {
+                        eventSource.close();
+                    }
+                    statusText.textContent = 'Download cancelled';
+                    downloadBtn.disabled = false;
+                    downloadBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Download';
+                    downloadBtn.classList.remove('from-red-600', 'to-red-700', 'hover:from-red-700', 'hover:to-red-800');
+                    downloadBtn.classList.add('from-green-600', 'to-green-700', 'hover:from-green-700', 'hover:to-green-800');
+                    progressContainer.classList.add('hidden');
+                    
+                    downloadStats.active--;
+                    downloadStats.failed++;
+                    updateStats();
+                });
+                
+                startEventSource();
+            }
+
+            // Utility Functions
+            function updateStats() {
+                document.getElementById('total-downloads').textContent = downloadStats.total;
+                document.getElementById('completed-downloads').textContent = downloadStats.completed;
+                document.getElementById('active-downloads').textContent = downloadStats.active;
+                document.getElementById('failed-downloads').textContent = downloadStats.failed;
+                
+                document.getElementById('queue-count').textContent = downloadStats.total;
+                document.getElementById('active-count').textContent = downloadStats.active;
+                document.getElementById('completed-count').textContent = downloadStats.completed;
+            }
+            
+            function showNotification(message, type = 'info') {
+                if (!settings.notifications) return;
+                
+                const notification = document.createElement('div');
+                notification.className = `notification p-4 rounded-lg shadow-lg text-white max-w-sm ${
+                    type === 'success' ? 'bg-green-600' :
+                    type === 'error' ? 'bg-red-600' :
+                    type === 'warning' ? 'bg-yellow-600' :
+                    'bg-blue-600'
+                }`;
+                
+                notification.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas ${
+                            type === 'success' ? 'fa-check-circle' :
+                            type === 'error' ? 'fa-exclamation-circle' :
+                            type === 'warning' ? 'fa-exclamation-triangle' :
+                            'fa-info-circle'
+                        } mr-3"></i>
+                        <span>${message}</span>
+                        <button class="ml-auto text-white hover:text-gray-200" onclick="this.parentElement.parentElement.remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                
+                document.getElementById('notification-container').appendChild(notification);
+                
+                setTimeout(() => notification.classList.add('show'), 100);
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => notification.remove(), 300);
+                }, 5000);
+            }
+            
+            function formatDuration(seconds) {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const secs = Math.floor(seconds % 60);
+                
+                if (hours > 0) {
+                    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }
+                return `${minutes}:${secs.toString().padStart(2, '0')}`;
+            }
+            
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            function formatNumber(num) {
+                if (num >= 1000000) {
+                    return (num / 1000000).toFixed(1) + 'M';
+                } else if (num >= 1000) {
+                    return (num / 1000).toFixed(1) + 'K';
+                }
+                return num.toString();
+            }
+            
+            function loadSettings() {
+                document.getElementById('default-quality').value = settings.defaultQuality;
+                document.getElementById('auto-download').checked = settings.autoDownload;
+                document.getElementById('notifications').checked = settings.notifications;
+                document.getElementById('concurrent-downloads').value = settings.concurrentDownloads;
+                updateConcurrentValue();
+            }
+            
+            function saveSettings() {
+                settings.defaultQuality = document.getElementById('default-quality').value;
+                settings.autoDownload = document.getElementById('auto-download').checked;
+                settings.notifications = document.getElementById('notifications').checked;
+                settings.concurrentDownloads = parseInt(document.getElementById('concurrent-downloads').value);
+                
+                localStorage.setItem('defaultQuality', settings.defaultQuality);
+                localStorage.setItem('autoDownload', settings.autoDownload);
+                localStorage.setItem('notifications', settings.notifications);
+                localStorage.setItem('concurrentDownloads', settings.concurrentDownloads);
+                
+                settingsModal.classList.add('hidden');
+                showNotification('Settings saved successfully!', 'success');
+            }
+            
+            function resetSettings() {
+                settings = {
+                    theme: 'light',
+                    defaultQuality: 'best_mp4',
+                    autoDownload: false,
+                    notifications: true,
+                    concurrentDownloads: 2
+                };
+                
+                localStorage.clear();
+                loadSettings();
+                showNotification('Settings reset to defaults', 'info');
+            }
+            
+            function updateConcurrentValue() {
+                document.getElementById('concurrent-value').textContent = document.getElementById('concurrent-downloads').value;
+            }
+            
+            function pauseAllDownloads() {
+                // Implementation for pausing downloads
+                showNotification('All downloads paused', 'warning');
+            }
+            
+            function resumeAllDownloads() {
+                // Implementation for resuming downloads
+                showNotification('All downloads resumed', 'success');
+            }
+            
+            function clearCompletedDownloads() {
+                const completedCards = document.querySelectorAll('[id^="job-"]');
+                completedCards.forEach(card => {
+                    const statusText = card.querySelector('.status-text');
+                    if (statusText && statusText.textContent === 'Download completed!') {
+                        card.remove();
+                    }
+                });
+                showNotification('Completed downloads cleared', 'info');
+            }
+        });
+    </script>
+</body>
+</html>
